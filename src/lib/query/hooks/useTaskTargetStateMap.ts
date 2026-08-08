@@ -53,6 +53,7 @@ const taskTargetStateLogger = createScopedLogger({
 
 function traceFrontend(event: string, details: Record<string, unknown>) {
   if (typeof window === 'undefined') return
+  if (localStorage.getItem('debug_fe_task_trace') !== '1') return
   console.info(`[FE_TASK_TRACE] ${event}`, details)
 }
 

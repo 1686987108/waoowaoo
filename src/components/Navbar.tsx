@@ -23,6 +23,7 @@ export default function Navbar() {
                 alt={tc('appName')}
                 width={80}
                 height={80}
+                unoptimized
                 className="object-contain transition-transform group-hover:scale-110"
               />
             </Link>
