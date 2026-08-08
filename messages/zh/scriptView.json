@@ -65,6 +65,9 @@
         "missingAssetsTip": "请先在",
         "missingAssetsTipLink": "中生成所有出场角色和场景的形象",
         "generating": "正在生成画面...",
-        "startGenerate": "确认并开始绘制 →"
+        "startGenerate": "确认并开始绘制 →",
+        "generateAllMissing": "一键生成全部缺失形象",
+        "generatingAll": "正在批量生成...",
+        "generatingAllProgress": "正在批量生成 ({current}/{total})"
     }
 }

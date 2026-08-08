@@ -181,7 +181,8 @@
         "regenerateAll": "重新生成全部",
         "regenerateAllConfirm": "确定要重新生成所有资产的图片吗？这将覆盖现有图片。",
         "noAssetsToGenerate": "没有可生成的资产",
-        "regenerateAllHint": "重新生成所有资产图片（覆盖现有）"
+        "regenerateAllHint": "重新生成所有资产图片（覆盖现有）",
+        "generateAllFailed": "有 {count} 个资产生成请求失败"
     },
     "common": {
         "actions": "操作",

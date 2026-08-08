@@ -178,6 +178,7 @@ export function useBatchGeneration({
         setIsBatchSubmittingAll(true)
         setBatchProgress({ current: 0, total: tasks.length })
 
+        const failures: string[] = []
         const allKeys = new Set(tasks.map(t => t.key))
         setPendingRegenerationKeys(prev => new Set([...prev, ...allKeys]))
         setPendingRegenerationBaselines(prev => {
@@ -200,7 +201,9 @@ export function useBatchGeneration({
                         submitted = true
                         setBatchProgress(prev => ({ ...prev, current: prev.current + 1 }))
                     } catch (error) {
+                        const failMsg = error instanceof Error ? error.message : String(error)
                         _ulogError(`Failed to generate ${task.type} ${task.id}:`, error)
+                        failures.push(`${task.type} ${task.id}: ${failMsg}`)
                         setBatchProgress(prev => ({ ...prev, current: prev.current + 1 }))
                     } finally {
                         if (submitted) return
@@ -222,6 +225,10 @@ export function useBatchGeneration({
             setIsBatchSubmittingAll(false)
             setBatchProgress({ current: 0, total: 0 })
             refreshAssets()
+        }
+
+        if (failures.length > 0) {
+            alert(t('toolbar.generateAllFailed', { count: failures.length }) + '\n\n' + failures[0])
         }
     }
 
@@ -266,6 +273,7 @@ export function useBatchGeneration({
         setIsBatchSubmittingAll(true)
         setBatchProgress({ current: 0, total: tasks.length })
 
+        const failures: string[] = []
         const allKeys = new Set(tasks.map(t => t.key))
         setPendingRegenerationKeys(prev => new Set([...prev, ...allKeys]))
         setPendingRegenerationBaselines(prev => {
@@ -288,7 +296,9 @@ export function useBatchGeneration({
                         submitted = true
                         setBatchProgress(prev => ({ ...prev, current: prev.current + 1 }))
                     } catch (error) {
+                        const failMsg = error instanceof Error ? error.message : String(error)
                         _ulogError(`Failed to generate ${task.type} ${task.id}:`, error)
+                        failures.push(`${task.type} ${task.id}: ${failMsg}`)
                         setBatchProgress(prev => ({ ...prev, current: prev.current + 1 }))
                     } finally {
                         if (submitted) return
@@ -310,6 +320,10 @@ export function useBatchGeneration({
             setIsBatchSubmittingAll(false)
             setBatchProgress({ current: 0, total: 0 })
             refreshAssets()
+        }
+
+        if (failures.length > 0) {
+            alert(t('toolbar.generateAllFailed', { count: failures.length }) + '\n\n' + failures[0])
         }
     }
 

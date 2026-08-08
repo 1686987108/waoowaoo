@@ -39,6 +39,9 @@ interface ScriptViewAssetsPanelProps {
   missingAssetsCount: number
   onGenerateStoryboard?: () => void
   isSubmittingStoryboardBuild: boolean
+  onGenerateAllAssets?: () => void
+  isGeneratingAllAssets: boolean
+  batchProgress?: { current: number; total: number }
   getSelectedAppearances: (char: Character) => CharacterAppearance[]
   tScript: (key: string, values?: Record<string, unknown>) => string
   tAssets: (key: string, values?: Record<string, unknown>) => string
@@ -133,6 +136,9 @@ export default function ScriptViewAssetsPanel({
   missingAssetsCount,
   onGenerateStoryboard,
   isSubmittingStoryboardBuild,
+  onGenerateAllAssets,
+  isGeneratingAllAssets,
+  batchProgress,
   getSelectedAppearances,
   tScript,
   tAssets,
@@ -703,12 +709,26 @@ export default function ScriptViewAssetsPanel({
               </button>
               {tScript('generate.missingAssetsTipLink')}
             </p>
+            {onGenerateAllAssets && (
+              <button
+                type="button"
+                onClick={onGenerateAllAssets}
+                disabled={isGeneratingAllAssets}
+                className="mt-3 w-full glass-btn-base glass-btn-primary rounded-xl px-4 py-2.5 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {isGeneratingAllAssets
+                  ? (batchProgress && batchProgress.total > 0
+                      ? tScript('generate.generatingAllProgress', { current: batchProgress.current, total: batchProgress.total })
+                      : tScript('generate.generatingAll'))
+                  : tScript('generate.generateAllMissing')}
+              </button>
+            )}
           </div>
         )}
         <button
           onClick={onGenerateStoryboard}
           disabled={isSubmittingStoryboardBuild || clips.length === 0 || !allAssetsHaveImages}
-          className="w-full py-4 text-lg font-bold bg-[var(--glass-accent-from)] text-white rounded-2xl"
+          className="w-full py-4 text-lg font-bold bg-[var(--glass-accent-from)] text-white rounded-2xl disabled:opacity-50 disabled:cursor-not-allowed transition-opacity"
         >
           {isSubmittingStoryboardBuild ? tScript('generate.generating') : tScript('generate.startGenerate')}
         </button>

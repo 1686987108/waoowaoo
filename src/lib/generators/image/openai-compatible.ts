@@ -79,9 +79,9 @@ function readStringOption(value: unknown, optionName: string): string | undefine
   return trimmed
 }
 
-function normalizeResponseFormat(value: unknown): OpenAIImageResponseFormat {
+function normalizeResponseFormat(value: unknown): OpenAIImageResponseFormat | undefined {
   const normalized = readStringOption(value, 'responseFormat')
-  if (!normalized) return 'b64_json'
+  if (!normalized) return undefined
   if (normalized === 'url' || normalized === 'b64_json') return normalized
   throw new Error(`OPENAI_COMPATIBLE_IMAGE_OPTION_UNSUPPORTED: responseFormat=${normalized}`)
 }
@@ -232,7 +232,7 @@ export class OpenAICompatibleImageGenerator extends BaseImageGenerator {
         model,
         prompt,
         image: await Promise.all(referenceImages.map((image, index) => toUploadFile(image, index))),
-        response_format: responseFormat,
+        ...(responseFormat ? { response_format: responseFormat } : {}),
         ...(outputFormat ? { output_format: outputFormat } : {}),
         ...(quality ? { quality } : {}),
         ...(size ? { size } : {}),
@@ -243,7 +243,7 @@ export class OpenAICompatibleImageGenerator extends BaseImageGenerator {
       response = await client.images.generate({
         model,
         prompt,
-        response_format: responseFormat,
+        ...(responseFormat ? { response_format: responseFormat } : {}),
         ...(outputFormat ? { output_format: outputFormat } : {}),
         ...(quality ? { quality } : {}),
         ...(size ? { size } : {}),

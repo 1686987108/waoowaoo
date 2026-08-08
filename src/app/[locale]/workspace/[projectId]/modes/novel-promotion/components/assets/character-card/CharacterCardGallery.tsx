@@ -104,6 +104,11 @@ export default function CharacterCardGallery(props: CharacterCardGalleryProps) {
     message: props.appearanceErrorMessage || null,
   })
 
+  // 当系统只给出模糊兜底文案时，把原始错误也暴露出来，便于排查
+  const fuzzyErrorCodes = new Set(['INTERNAL_ERROR', 'GENERATION_FAILED', 'WORKER_EXECUTION_ERROR'])
+  const rawErrorMessage = props.appearanceErrorMessage || null
+  const shouldShowRawError = appearanceErrorDisplay && rawErrorMessage && fuzzyErrorCodes.has(appearanceErrorDisplay.code)
+
   return (
     <div className="rounded-lg overflow-hidden border-2 border-[var(--glass-stroke-base)] relative">
       {props.currentImageUrl ? (
@@ -124,10 +129,18 @@ export default function CharacterCardGallery(props: CharacterCardGalleryProps) {
       ) : (
         <div className="w-full h-full bg-[var(--glass-bg-muted)] flex items-center justify-center">
           {appearanceErrorDisplay && !props.isAppearanceTaskRunning ? (
-            <div className="flex flex-col items-center justify-center py-8 px-4 text-center">
+            <div
+              className="flex flex-col items-center justify-center py-8 px-4 text-center"
+              title={rawErrorMessage || undefined}
+            >
               <AppIcon name="alert" className="w-8 h-8 text-[var(--glass-tone-danger-fg)] mb-2" />
               <div className="text-[var(--glass-tone-danger-fg)] text-xs font-medium mb-1">{t('common.generateFailed')}</div>
               <div className="text-[var(--glass-tone-danger-fg)] text-xs max-w-full break-words">{appearanceErrorDisplay.message}</div>
+              {shouldShowRawError && (
+                <div className="mt-2 text-[var(--glass-text-secondary)] text-[10px] max-w-full break-words line-clamp-3">
+                  {rawErrorMessage}
+                </div>
+              )}
             </div>
           ) : (
             <AppIcon name="userAlt" className="w-8 h-8 text-[var(--glass-text-tertiary)]" />

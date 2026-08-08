@@ -181,7 +181,8 @@
         "regenerateAll": "Regenerate All",
         "regenerateAllConfirm": "Regenerate images for all assets? This will overwrite existing images.",
         "noAssetsToGenerate": "No assets available for generation",
-        "regenerateAllHint": "Regenerate all asset images (overwrite existing)"
+        "regenerateAllHint": "Regenerate all asset images (overwrite existing)",
+        "generateAllFailed": "{count} asset generation requests failed"
     },
     "common": {
         "actions": "Actions",

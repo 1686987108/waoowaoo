@@ -13,6 +13,7 @@ import {
 } from './clip-asset-utils'
 import ScriptViewScriptPanel from './ScriptViewScriptPanel'
 import ScriptViewAssetsPanel from './ScriptViewAssetsPanel'
+import { useBatchGeneration } from '../assets/hooks/useBatchGeneration'
 import {
   getPrimaryAppearance,
   getSelectedAppearances,
@@ -90,6 +91,8 @@ export default function ScriptView({
   const { data: assets } = useProjectAssets(projectId)
   const characters: Character[] = useMemo(() => assets?.characters ?? [], [assets?.characters])
   const locations: Location[] = useMemo(() => assets?.locations ?? [], [assets?.locations])
+
+  const { handleGenerateAllImages, isBatchSubmitting: isGeneratingAllAssets, batchProgress } = useBatchGeneration({ projectId })
 
   const [activeCharIds, setActiveCharIds] = useState<string[]>([])
   const [activeLocationIds, setActiveLocationIds] = useState<string[]>([])
@@ -386,6 +389,9 @@ export default function ScriptView({
         missingAssetsCount={missingAssetsCount}
         onGenerateStoryboard={onGenerateStoryboard}
         isSubmittingStoryboardBuild={isSubmittingStoryboardBuild}
+        onGenerateAllAssets={handleGenerateAllImages}
+        isGeneratingAllAssets={isGeneratingAllAssets}
+        batchProgress={batchProgress}
         getSelectedAppearances={(char) => getSelectedAppearances(char, selectedAppearanceKeys)}
         tScript={(key, values) => tScript(key, toTranslationValues(values))}
         tAssets={(key, values) => tAssets(key, toTranslationValues(values))}
