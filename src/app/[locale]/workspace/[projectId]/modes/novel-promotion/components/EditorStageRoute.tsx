@@ -19,15 +19,34 @@ export default function VideoEditorStageRoute({ onBack }: VideoEditorStageRouteP
   useEffect(() => {
     if (!projectId || !episodeId) return
 
-    const loadProject = async () => {
+    const loadOrCreateProject = async () => {
       try {
         setLoading(true)
+        // 1. 先尝试从 DB 加载已有项目
         const res = await fetch(`/api/novel-promotion/${projectId}/editor?episodeId=${episodeId}`)
         if (!res.ok) {
           throw new Error('Failed to load editor project')
         }
         const data = await res.json()
-        setProject(data.projectData)
+
+        if (data.projectData) {
+          // 已有项目，直接使用
+          setProject(data.projectData)
+          return
+        }
+
+        // 2. DB 无项目，自动从成片面板创建（导入所有视频+配音素材）
+        const createRes = await fetch(`/api/novel-promotion/${projectId}/editor/create`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ episodeId }),
+        })
+        if (!createRes.ok) {
+          const errData = await createRes.json().catch(() => null)
+          throw new Error(errData?.error?.message || 'Failed to import materials')
+        }
+        const createData = await createRes.json()
+        setProject(createData.projectData)
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Unknown error')
       } finally {
@@ -35,7 +54,7 @@ export default function VideoEditorStageRoute({ onBack }: VideoEditorStageRouteP
       }
     }
 
-    loadProject()
+    loadOrCreateProject()
   }, [projectId, episodeId])
 
   const handleBack = () => {
