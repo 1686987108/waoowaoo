@@ -27,6 +27,10 @@ export const imageQueue = new Queue<TaskJobData>(QUEUE_NAME.IMAGE, {
 export const videoQueue = new Queue<TaskJobData>(QUEUE_NAME.VIDEO, {
   connection: queueRedis,
   defaultJobOptions,
+  limiter: {
+    max: 1,
+    duration: 60_000,
+  },
 })
 
 export const voiceQueue = new Queue<TaskJobData>(QUEUE_NAME.VOICE, {

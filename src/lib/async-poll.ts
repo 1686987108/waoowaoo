@@ -255,13 +255,37 @@ async function pollOpenAIVideoTask(
         return { status: 'pending' }
     }
 
-    // Completed: prefer video_url from response body (some gateways provide it directly)
-    const videoUrl = typeof task.video_url === 'string' ? task.video_url.trim() : ''
-    if (videoUrl) {
+    // Completed: some gateways provide url/video_url directly in the status response
+    const directUrl = (typeof task.url === 'string' ? task.url.trim() : '')
+        || (typeof task.video_url === 'string' ? task.video_url.trim() : '')
+    if (directUrl) {
         return {
             status: 'completed',
-            videoUrl,
-            resultUrl: videoUrl,
+            videoUrl: directUrl,
+            resultUrl: directUrl,
+        }
+    }
+
+    // Agnes-style gateways expose the real download URL via /agnesapi?video_id={video_id}
+    const videoIdFromTask = typeof task.video_id === 'string' ? task.video_id.trim() : ''
+    if (videoIdFromTask && /agnes-ai\.(cn|com)/i.test(baseUrl)) {
+        const agnesApiUrl = `${baseUrl.replace(/\/v1$/, '')}/agnesapi?video_id=${encodeURIComponent(videoIdFromTask)}`
+        const agnesResponse = await fetch(agnesApiUrl, {
+            method: 'GET',
+            headers: { Authorization: `Bearer ${config.apiKey}` },
+        })
+        if (!agnesResponse.ok) {
+            const text = await agnesResponse.text().catch(() => '')
+            throw new Error(`AGNES_VIDEO_POLL_FAILED: ${agnesResponse.status} ${text.slice(0, 200)}`)
+        }
+        const agnesResult = await agnesResponse.json() as Record<string, unknown>
+        const agnesVideoUrl = typeof agnesResult.url === 'string' ? agnesResult.url.trim() : ''
+        if (agnesVideoUrl) {
+            return {
+                status: 'completed',
+                videoUrl: agnesVideoUrl,
+                resultUrl: agnesVideoUrl,
+            }
         }
     }
 
