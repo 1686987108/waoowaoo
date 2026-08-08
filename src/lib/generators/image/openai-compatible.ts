@@ -67,6 +67,77 @@ async function toUploadFile(imageSource: string, index: number): Promise<File> {
   return await toFile(bytes, `reference-${index}.png`, { type: 'image/png' })
 }
 
+/**
+ * 将参考图源转换为 data URL 字符串（供 /v1/images/generations 的 image 参数使用）。
+ * 与 toUploadFile 逻辑一致，但产物为 JSON body 可直接内联的 data URL。
+ */
+async function toReferenceDataUrls(imageSources: string[]): Promise<string[]> {
+  const results: string[] = []
+  for (let index = 0; index < imageSources.length; index += 1) {
+    const imageSource = imageSources[index]
+    const parsedDataUrl = parseDataUrl(imageSource)
+    if (parsedDataUrl) {
+      results.push(imageSource)
+      continue
+    }
+
+    if (imageSource.startsWith('http://') || imageSource.startsWith('https://') || imageSource.startsWith('/')) {
+      const cachedDataUrl = await getImageBase64Cached(toAbsoluteUrlIfNeeded(imageSource))
+      const parsedCached = parseDataUrl(cachedDataUrl)
+      if (!parsedCached) {
+        throw new Error(`OPENAI_IMAGE_REFERENCE_INVALID: failed to parse image source ${index}`)
+      }
+      results.push(cachedDataUrl)
+      continue
+    }
+
+    results.push(`data:image/png;base64,${imageSource}`)
+  }
+  return results
+}
+
+/**
+ * 通过 /v1/images/generations 进行图生图（部分自定义端点不支持 /v1/images/edits，
+ * 但支持在 generations 请求中附带 image 参数）。
+ */
+async function generateWithImage(
+  client: OpenAI,
+  model: string,
+  prompt: string,
+  referenceImages: string[],
+  extra: {
+    responseFormat?: OpenAIImageResponseFormat
+    outputFormat?: OpenAIImageOutputFormat
+    quality?: OpenAIImageGenerateQuality
+    size?: OpenAIImageGenerateSize
+  },
+): Promise<OpenAI.Images.ImagesResponse> {
+  const referenceDataUrls = await toReferenceDataUrls(referenceImages)
+  return (await client.images.generate({
+    model,
+    prompt,
+    // OpenAI TS 类型未在 images.generate 暴露 image，但 Agnes 等兼容端点接受该参数
+    image: referenceDataUrls as unknown as string,
+    ...(extra.responseFormat ? { response_format: extra.responseFormat } : {}),
+    ...(extra.outputFormat ? { output_format: extra.outputFormat } : {}),
+    ...(extra.quality ? { quality: extra.quality } : {}),
+    ...(extra.size ? { size: extra.size } : {}),
+  } as unknown as OpenAI.Images.ImageGenerateParams)) as OpenAI.Images.ImagesResponse
+}
+
+/**
+ * 判断是否为「provider 不支持 /v1/images/edits 端点」导致的失败。
+ * 用于触发降级到 generations + image。仅命中 404 / NotFound 类错误时降级，
+ * 避免掩盖内容审核、参数错误等真实问题。
+ */
+function isImagesEditNotSupported(err: unknown): boolean {
+  if (err instanceof OpenAI.APIError && err.status === 404) {
+    return true
+  }
+  const message = err instanceof Error ? err.message : String(err ?? '')
+  return /not\s*found/i.test(message) || /NotFoundError/i.test(message)
+}
+
 function readStringOption(value: unknown, optionName: string): string | undefined {
   if (value === undefined || value === null) return undefined
   if (typeof value !== 'string') {
@@ -224,20 +295,9 @@ export class OpenAICompatibleImageGenerator extends BaseImageGenerator {
     const outputFormat = normalizeOutputFormat(options.outputFormat)
     const rawSize = resolveRawSize(options)
 
-    let response
-    if (referenceImages.length > 0) {
-      const quality = normalizeEditQuality(options.quality)
-      const size = normalizeEditSize(rawSize)
-      response = await client.images.edit({
-        model,
-        prompt,
-        image: await Promise.all(referenceImages.map((image, index) => toUploadFile(image, index))),
-        ...(responseFormat ? { response_format: responseFormat } : {}),
-        ...(outputFormat ? { output_format: outputFormat } : {}),
-        ...(quality ? { quality } : {}),
-        ...(size ? { size } : {}),
-      })
-    } else {
+    let response: OpenAI.Images.ImagesResponse | undefined
+
+    if (referenceImages.length === 0) {
       const quality = normalizeGenerateQuality(options.quality)
       const size = normalizeGenerateSize(rawSize)
       response = await client.images.generate({
@@ -248,6 +308,39 @@ export class OpenAICompatibleImageGenerator extends BaseImageGenerator {
         ...(quality ? { quality } : {}),
         ...(size ? { size } : {}),
       })
+    } else if (config.imageEditMode === 'generate') {
+      // 显式配置：此 provider 的图生图走 generations + image（不走 edits）
+      response = await generateWithImage(client, model, prompt, referenceImages, {
+        responseFormat,
+        outputFormat,
+        quality: normalizeGenerateQuality(options.quality),
+        size: normalizeGenerateSize(rawSize),
+      })
+    } else {
+      // 默认走 edits；若 provider 不支持该端点（404 / NotFound），降级到 generations + image
+      const quality = normalizeEditQuality(options.quality)
+      const size = normalizeEditSize(rawSize)
+      try {
+        response = await client.images.edit({
+          model,
+          prompt,
+          image: await Promise.all(referenceImages.map((image, index) => toUploadFile(image, index))),
+          ...(responseFormat ? { response_format: responseFormat } : {}),
+          ...(outputFormat ? { output_format: outputFormat } : {}),
+          ...(quality ? { quality } : {}),
+          ...(size ? { size } : {}),
+        })
+      } catch (err) {
+        if (!isImagesEditNotSupported(err)) {
+          throw err
+        }
+        response = await generateWithImage(client, model, prompt, referenceImages, {
+          responseFormat,
+          outputFormat,
+          quality: normalizeGenerateQuality(options.quality),
+          size: normalizeGenerateSize(rawSize),
+        })
+      }
     }
 
     const image = Array.isArray(response.data) ? response.data[0] : null

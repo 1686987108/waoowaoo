@@ -40,6 +40,12 @@ interface CustomProvider {
   baseUrl?: string
   apiKey?: string
   apiMode?: 'gemini-sdk' | 'openai-official'
+  /**
+   * 图生图（带参考图）调用方式：
+   * - 'edit'（默认）：调用 /v1/images/edits（OpenAI gpt-image-1 等官方行为）
+   * - 'generate'：调用 /v1/images/generations 并附带 image 参数（Agnes 等自定义端点不支持 edits 时使用）
+   */
+  imageEditMode?: 'edit' | 'generate'
 }
 
 function normalizeProviderBaseUrl(providerId: string, rawBaseUrl?: string): string | undefined {
@@ -124,12 +130,18 @@ function parseCustomProviders(rawProviders: string | null | undefined): CustomPr
       ? apiModeRaw
       : undefined
 
+    const imageEditModeRaw = raw.imageEditMode
+    const imageEditMode = imageEditModeRaw === 'edit' || imageEditModeRaw === 'generate'
+      ? imageEditModeRaw
+      : undefined
+
     providers.push({
       id,
       name,
       baseUrl: readTrimmedString(raw.baseUrl) || undefined,
       apiKey: readTrimmedString(raw.apiKey) || undefined,
       apiMode,
+      imageEditMode,
     })
   }
 
@@ -308,6 +320,11 @@ export interface ProviderConfig {
   apiKey: string
   baseUrl?: string
   apiMode?: 'gemini-sdk' | 'openai-official'
+  /**
+   * 图生图（带参考图）调用方式；未配置时默认 'edit'。
+   * 详见 CustomProvider.imageEditMode。
+   */
+  imageEditMode?: 'edit' | 'generate'
 }
 
 export async function getProviderConfig(userId: string, providerId: string): Promise<ProviderConfig> {
@@ -324,6 +341,7 @@ export async function getProviderConfig(userId: string, providerId: string): Pro
     apiKey: decryptApiKey(provider.apiKey),
     baseUrl: normalizeProviderBaseUrl(provider.id, provider.baseUrl),
     apiMode: provider.apiMode,
+    imageEditMode: provider.imageEditMode,
   }
 }
 
