@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useMemo } from 'react'
-import { useTaskList } from '@/lib/query/hooks/useTaskStatus'
+import { useTaskList, type TaskItem } from '@/lib/query/hooks/useTaskStatus'
 import { resolveErrorDisplay } from '@/lib/errors/display'
 import { useDismissFailedTasks } from '@/lib/query/mutations/task-mutations'
 
@@ -11,17 +11,20 @@ interface UseStoryboardGroupTaskErrorsParams {
 }
 
 /**
- * 从数据库查询 panel 级别的 failed tasks，并提供 dismiss 能力。
+ * 从数据库查询 panel 级别的任务错误，并提供 dismiss 能力。
+ * 只保留每个 panel 的**最新终态任务**（failed / completed / dismissed），
+ * 如果最新任务是 completed，则忽略该 panel 的历史 failed 记录，
+ * 避免成功生成后仍被旧失败任务覆盖。
  * dismiss 通过 API 将 task 状态改为 'dismissed'，数据库为唯一来源。
  */
 export function useStoryboardGroupTaskErrors({
   projectId,
 }: UseStoryboardGroupTaskErrorsParams) {
-  const panelFailedTasksQuery = useTaskList({
+  const panelTerminalTasksQuery = useTaskList({
     projectId,
     targetType: 'NovelPromotionPanel',
-    statuses: ['failed'],
-    limit: 200,
+    statuses: ['failed', 'completed', 'dismissed'],
+    limit: 400,
     enabled: !!projectId,
   })
 
@@ -29,23 +32,35 @@ export function useStoryboardGroupTaskErrors({
 
   const panelTaskErrorMap = useMemo(() => {
     const map = new Map<string, { taskId: string; message: string }>()
-    for (const task of panelFailedTasksQuery.data || []) {
-      const display = resolveErrorDisplay(task.error || null)
-      if (!display) continue
-      if (!map.has(task.targetId)) {
-        map.set(task.targetId, { taskId: task.id, message: display.message })
+    const tasks = panelTerminalTasksQuery.data || []
+
+    // 按 panel 分组，只取 updatedAt 最新的任务
+    const latestByPanel = new Map<string, TaskItem>()
+    for (const task of tasks) {
+      const existing = latestByPanel.get(task.targetId)
+      if (!existing || new Date(task.updatedAt) > new Date(existing.updatedAt)) {
+        latestByPanel.set(task.targetId, task)
       }
     }
+
+    // 只有最新任务为 failed 时才显示错误
+    for (const task of latestByPanel.values()) {
+      if (task.status !== 'failed') continue
+      const display = resolveErrorDisplay(task.error || null)
+      if (!display) continue
+      map.set(task.targetId, { taskId: task.id, message: display.message })
+    }
+
     return map
-  }, [panelFailedTasksQuery.data])
+  }, [panelTerminalTasksQuery.data])
 
   const clearPanelTaskError = useCallback((panelId: string) => {
-    const taskIds = (panelFailedTasksQuery.data || [])
-      .filter((task) => task.targetId === panelId)
+    const taskIds = (panelTerminalTasksQuery.data || [])
+      .filter((task) => task.targetId === panelId && task.status === 'failed')
       .map((task) => task.id)
     if (taskIds.length === 0) return
     dismissMutation.mutate(taskIds)
-  }, [dismissMutation, panelFailedTasksQuery.data])
+  }, [dismissMutation, panelTerminalTasksQuery.data])
 
   return {
     panelTaskErrorMap,

@@ -155,8 +155,6 @@ export default function ImageSection({
         ) : (
           renderLoadingState(imageUrl ? 'regenerate' : 'generate', imageUrl)
         )
-      ) : failedError ? (
-        renderFailedState()
       ) : imageUrl ? (
         <MediaImageWithLoading
           src={imageUrl}
@@ -167,6 +165,8 @@ export default function ImageSection({
           title={onPreviewImage ? t('image.clickToPreview') : undefined}
           sizes="(max-width: 768px) 100vw, 33vw"
         />
+      ) : failedError ? (
+        renderFailedState()
       ) : (
         renderEmptyState()
       )}
