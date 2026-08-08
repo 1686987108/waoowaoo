@@ -18,28 +18,48 @@ interface PanelData {
     videoUrl?: string
     description?: string
     duration?: number
+    voiceLine?: {
+        id: string
+        speaker: string
+        content: string
+        audioUrl?: string | null
+    }
 }
 
 /**
  * 从已生成的视频面板创建编辑器项目
+ * 支持通过 voiceLine 字段直接关联配音，确保精确匹配
  */
 export function createProjectFromPanels(
     episodeId: string,
-    panels: PanelData[],
-    voiceLines?: Array<{ id: string; speaker: string; content: string; audioUrl?: string | null }>
+    panels: PanelData[]
 ): VideoEditorProject {
     // 过滤出有视频的面板
     const videoPanels = panels.filter(p => p.videoUrl)
 
+    if (videoPanels.length === 0) {
+        throw new Error('NO_VIDEO_PANELS: 没有可用的视频素材')
+    }
+
     // 创建视频片段
     const timeline: VideoClip[] = videoPanels.map((panel, index) => {
-        // 查找匹配的配音（简单匹配：按索引）
-        const matchedVoice = voiceLines?.[index]
+        // 优先使用面板关联的配音（精确匹配）
+        const matchedVoice = panel.voiceLine
+
+        // 计算片段时长：优先使用配音时长，否则使用面板 duration
+        let durationInSeconds = panel.duration || 3
+        if (matchedVoice?.audioUrl && panel.duration !== undefined) {
+            // 如果有配音且面板指定了 duration，使用面板时长
+            durationInSeconds = panel.duration
+        } else if (matchedVoice?.audioUrl) {
+            // 如果没有指定 duration，使用默认值
+            durationInSeconds = 3
+        }
 
         return {
             id: `clip_${panel.id || panel.storyboardId}_${panel.panelIndex ?? index}`,
             src: panel.videoUrl!,
-            durationInFrames: Math.round((panel.duration || 3) * 30), // 默认 3 秒，30fps
+            durationInFrames: Math.round(durationInSeconds * 30), // 30fps
             attachment: {
                 audio: matchedVoice?.audioUrl ? {
                     src: matchedVoice.audioUrl,
