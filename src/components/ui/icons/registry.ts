@@ -117,6 +117,7 @@ export const iconRegistry = {
   sparkles: Sparkles,
   sparklesAlt: WandSparkles,
   alert: TriangleAlert,
+  alertCircle: TriangleAlert,
   alertSolid: TriangleAlert,
   alertOutline: TriangleAlert,
   pause: Pause,
