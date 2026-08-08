@@ -1,6 +1,5 @@
 'use client'
 
-import Image from 'next/image'
 import type { CSSProperties, ImgHTMLAttributes, MouseEventHandler } from 'react'
 
 export type MediaImageProps = {
@@ -35,34 +34,20 @@ export function MediaImage({
 }: MediaImageProps) {
   if (!src) return null
 
+  // /m/<publicId> 是项目自身的动态媒体路由，已经能正确返回图片并带缓存头。
+  // 在 Next.js 15 + Turbopack dev 模式下，next/image 对动态路由会走到内部的
+  // /api/asset?ar=... 优化端点，该端点无法识别 /m/ 资源并返回 400。
+  // 因此所有 /m/ 路径直接走原生 <img>，避免经过 next/image 优化器。
   if (isStableMediaRoute(src)) {
-    if (fill) {
-      return (
-        <Image
-          src={src}
-          alt={alt}
-          fill
-          sizes={sizes || '100vw'}
-          priority={priority}
-          className={className}
-          style={style}
-          onClick={onClick}
-          {...imgProps}
-        />
-      )
-    }
-
     return (
-      <Image
+      // eslint-disable-next-line @next/next/no-img-element
+      <img
         src={src}
         alt={alt}
-        width={width}
-        height={height}
-        sizes={sizes}
-        priority={priority}
         className={className}
         style={style}
         onClick={onClick}
+        loading={priority ? 'eager' : 'lazy'}
         {...imgProps}
       />
     )
