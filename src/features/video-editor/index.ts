@@ -25,8 +25,10 @@ export {
     framesToTime,
     timeToFrames,
     generateClipId,
-    createDefaultProject
-} from './utils/time-utils'
+    createDefaultProject,
+    createProjectFromPanels,
+    type PanelData
+} from './utils'
 
 export {
     migrateProjectData,
@@ -39,4 +41,4 @@ export { TransitionPicker } from './components/TransitionPicker'
 
 // Hooks
 export { useEditorState } from './hooks/useEditorState'
-export { useEditorActions, createProjectFromPanels } from './hooks/useEditorActions'
+export { useEditorActions } from './hooks/useEditorActions'

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { requireProjectAuthLight, isErrorResponse } from '@/lib/api-auth'
 import { apiHandler, ApiError } from '@/lib/api-errors'
-import { createProjectFromPanels } from '@/features/video-editor'
+import { createProjectFromPanels } from '@/features/video-editor/utils/project-creator'
 
 /**
  * POST /api/novel-promotion/[projectId]/editor/create
