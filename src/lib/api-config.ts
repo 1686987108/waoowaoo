@@ -46,6 +46,12 @@ interface CustomProvider {
    * - 'generate'：调用 /v1/images/generations 并附带 image 参数（Agnes 等自定义端点不支持 edits 时使用）
    */
   imageEditMode?: 'edit' | 'generate'
+  /**
+   * 视频生成请求体格式：
+   * - 'multipart'（默认）：使用 OpenAI SDK 的 input_reference: File 走 multipart/form-data
+   * - 'json'：使用 application/json 并附带 image 参数（Agnes 等自定义端点不支持 multipart 时使用）
+   */
+  videoMode?: 'multipart' | 'json'
 }
 
 function normalizeProviderBaseUrl(providerId: string, rawBaseUrl?: string): string | undefined {
@@ -135,6 +141,11 @@ function parseCustomProviders(rawProviders: string | null | undefined): CustomPr
       ? imageEditModeRaw
       : undefined
 
+    const videoModeRaw = raw.videoMode
+    const videoMode = videoModeRaw === 'multipart' || videoModeRaw === 'json'
+      ? videoModeRaw
+      : undefined
+
     providers.push({
       id,
       name,
@@ -142,6 +153,7 @@ function parseCustomProviders(rawProviders: string | null | undefined): CustomPr
       apiKey: readTrimmedString(raw.apiKey) || undefined,
       apiMode,
       imageEditMode,
+      videoMode,
     })
   }
 
@@ -325,6 +337,11 @@ export interface ProviderConfig {
    * 详见 CustomProvider.imageEditMode。
    */
   imageEditMode?: 'edit' | 'generate'
+  /**
+   * 视频生成请求体格式；未配置时默认 'multipart'。
+   * 详见 CustomProvider.videoMode。
+   */
+  videoMode?: 'multipart' | 'json'
 }
 
 export async function getProviderConfig(userId: string, providerId: string): Promise<ProviderConfig> {
@@ -342,6 +359,7 @@ export async function getProviderConfig(userId: string, providerId: string): Pro
     baseUrl: normalizeProviderBaseUrl(provider.id, provider.baseUrl),
     apiMode: provider.apiMode,
     imageEditMode: provider.imageEditMode,
+    videoMode: provider.videoMode,
   }
 }
 

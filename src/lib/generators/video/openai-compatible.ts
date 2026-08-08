@@ -178,6 +178,18 @@ function isEndpointUnsupportedError(error: unknown): boolean {
   return false
 }
 
+/**
+ * 判断是否为 provider 只接受 JSON 请求体的错误（multipart 走 SDK 时常见）
+ */
+function isJsonOnlyEndpointError(error: unknown): boolean {
+  if (!(error instanceof Error)) return false
+  const message = error.message || ''
+  if (/only\s*supports\s*Content-Type:\s*application\/json/i.test(message)) return true
+  if (/Please\s*send\s*a\s*JSON\s*request\s*body/i.test(message)) return true
+  const statusCode = (error as { status?: number }).status
+  return statusCode === 400 && (/application\/json/i.test(message) || /JSON/i.test(message))
+}
+
 export class OpenAICompatibleVideoGenerator extends BaseVideoGenerator {
   private readonly providerId?: string
 
@@ -229,23 +241,15 @@ export class OpenAICompatibleVideoGenerator extends BaseVideoGenerator {
       ...(size ? { size } : {}),
     }
 
-    // Handle image reference (only for SDK path, fallback uses image_url)
-    let inputReference: File | undefined
-    if (imageUrl) {
-      inputReference = await toUploadFileFromImageUrl(imageUrl)
-    }
+    const client = new OpenAI({
+      apiKey: config.apiKey,
+      baseURL: config.baseUrl,
+    })
 
-    // Strategy: try OpenAI SDK first (/v1/videos), fallback to /v1/video/create
-    let videoId: string
-
-    try {
-      const client = new OpenAI({
-        apiKey: config.apiKey,
-        baseURL: config.baseUrl,
-      })
+    async function createVideoViaSdk(imageParam: unknown): Promise<string> {
       const sdkPayload = {
         ...requestPayload,
-        ...(inputReference ? { input_reference: inputReference } : {}),
+        ...(imageParam !== undefined ? { image: imageParam } : {}),
       }
       const response = await client.videos.create(
         sdkPayload as Parameters<typeof client.videos.create>[0],
@@ -253,23 +257,75 @@ export class OpenAICompatibleVideoGenerator extends BaseVideoGenerator {
       if (!response.id || typeof response.id !== 'string') {
         throw new Error('OPENAI_VIDEO_CREATE_INVALID_RESPONSE: missing video id')
       }
-      videoId = response.id
-    } catch (sdkError) {
-      // If endpoint is not supported, fallback to /video/create
-      if (!isEndpointUnsupportedError(sdkError)) {
-        throw sdkError
-      }
+      return response.id
+    }
 
+    async function createVideoViaFetchFallbackWrapper(): Promise<string> {
       const fallbackPayload: Record<string, unknown> = { ...requestPayload }
       if (imageUrl) {
         fallbackPayload.image_url = imageUrl
       }
       const fallbackResult = await createVideoViaFetchFallback(
-        config.baseUrl,
+        config.baseUrl!,
         config.apiKey,
         fallbackPayload,
       )
-      videoId = fallbackResult.id
+      return fallbackResult.id
+    }
+
+    /**
+     * Strategy:
+     * 1. If provider explicitly configured as videoMode='json',
+     *    send application/json with image as base64 data URL (Agnes 等自定义端点)。
+     * 2. Otherwise default to SDK multipart with input_reference: File。
+     *    - If provider returns "only supports application/json", retry with JSON image。
+     *    - If endpoint is unsupported (404/405), fallback to /video/create。
+     */
+    let videoId: string
+
+    if (config.videoMode === 'json') {
+      videoId = await createVideoViaSdk(imageUrl)
+    }
+    else {
+      let inputReference: File | undefined
+      if (imageUrl) {
+        inputReference = await toUploadFileFromImageUrl(imageUrl)
+      }
+
+      try {
+        const sdkPayload = {
+          ...requestPayload,
+          ...(inputReference ? { input_reference: inputReference } : {}),
+        }
+        const response = await client.videos.create(
+          sdkPayload as Parameters<typeof client.videos.create>[0],
+        )
+        if (!response.id || typeof response.id !== 'string') {
+          throw new Error('OPENAI_VIDEO_CREATE_INVALID_RESPONSE: missing video id')
+        }
+        videoId = response.id
+      }
+      catch (sdkError) {
+        if (isJsonOnlyEndpointError(sdkError) && imageUrl) {
+          try {
+            videoId = await createVideoViaSdk(imageUrl)
+          }
+          catch (jsonError) {
+            if (isEndpointUnsupportedError(jsonError)) {
+              videoId = await createVideoViaFetchFallbackWrapper()
+            }
+            else {
+              throw jsonError
+            }
+          }
+        }
+        else if (isEndpointUnsupportedError(sdkError)) {
+          videoId = await createVideoViaFetchFallbackWrapper()
+        }
+        else {
+          throw sdkError
+        }
+      }
     }
 
     const providerToken = encodeProviderId(config.id)
