@@ -77,6 +77,7 @@ export function useWorkspaceStageRuntime({
   handleGenerateAllVideos,
   handleUpdateVideoPrompt,
   handleUpdatePanelVideoModel,
+  onEnterEditor,
 }: UseWorkspaceStageRuntimeParams) {
   const resolvedUserVideoModels = useMemo(
     () => userVideoModels || [],
@@ -134,5 +135,6 @@ export function useWorkspaceStageRuntime({
     capabilityOverrides,
     videoModel,
     videoRatio,
+    onEnterEditor,
   ])
 }
