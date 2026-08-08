@@ -130,8 +130,8 @@ export async function getProjectModelConfig(
 
   return {
     analysisModel: extractModelKey(projectData?.analysisModel) || extractModelKey(userPref?.analysisModel) || null,
-    characterModel: extractModelKey(projectData?.characterModel) || null,
-    locationModel: extractModelKey(projectData?.locationModel) || null,
+    characterModel: extractModelKey(projectData?.characterModel) || extractModelKey(userPref?.characterModel) || null,
+    locationModel: extractModelKey(projectData?.locationModel) || extractModelKey(userPref?.locationModel) || null,
     storyboardModel: extractModelKey(projectData?.storyboardModel) || null,
     editModel: extractModelKey(projectData?.editModel) || null,
     videoModel: extractModelKey(projectData?.videoModel) || null,
@@ -262,7 +262,26 @@ export async function buildImageBillingPayload(input: {
   basePayload: Record<string, unknown>
 }): Promise<Record<string, unknown>> {
   const { projectId, userId, imageModel, basePayload } = input
-  if (!imageModel) return basePayload
+  let modelToUse = imageModel
+  if (!modelToUse) {
+    // Try to get the model from project config based on the type in basePayload
+    const type = basePayload.type as 'character' | 'location'
+    const projectModelConfig = await getProjectModelConfig(projectId, userId)
+    modelToUse = type === 'character'
+      ? projectModelConfig.characterModel
+      : projectModelConfig.locationModel
+  }
+  if (!modelToUse) {
+    // Fallback to user config
+    const userModelConfig = await getUserModelConfig(userId)
+    const type = basePayload.type as 'character' | 'location'
+    modelToUse = type === 'character'
+      ? userModelConfig.characterModel
+      : userModelConfig.locationModel
+  }
+  if (!modelToUse) {
+    throw new Error('Image model is not configured for the project or user')
+  }
 
   let capabilityOptions: Record<string, CapabilityValue> = {}
   try {
@@ -270,7 +289,7 @@ export async function buildImageBillingPayload(input: {
       projectId,
       userId,
       modelType: 'image',
-      modelKey: imageModel,
+      modelKey: modelToUse,
     })
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Image model capability not configured'
@@ -279,7 +298,7 @@ export async function buildImageBillingPayload(input: {
 
   return {
     ...basePayload,
-    imageModel,
+    imageModel: modelToUse,
     ...(Object.keys(capabilityOptions).length > 0 ? { generationOptions: capabilityOptions } : {}),
   }
 }
