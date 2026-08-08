@@ -17,6 +17,7 @@ interface StageNavigationProps {
   hasTextStoryboards: boolean  // 是否有文字分镜（用于启用分镜面板）
   hasVideos?: boolean
   hasVoiceLines?: boolean  // 是否有配音台词
+  hasEditor?: boolean  // 是否有可以进入剪辑的视频
   isDisabled: boolean
   onStageClick: (stage: string) => void
 }
@@ -32,6 +33,7 @@ export function StageNavigation({
   hasTextStoryboards,
   hasVideos,
   hasVoiceLines,
+  hasEditor,
   isDisabled,
   onStageClick
 }: StageNavigationProps) {
@@ -45,7 +47,8 @@ export function StageNavigation({
     { id: 'storyboard', label: t('storyboard'), enabled: hasTextStoryboards || hasStoryboards },
     { id: 'videos', label: t('videos'), enabled: hasStoryboards || hasVideos },
     // 配音阶段只要有文本输入就可以启用，不受其他条件限制
-    { id: 'voice', label: t('voice'), enabled: hasNovelText || hasVoiceLines }
+    { id: 'voice', label: t('voice'), enabled: hasNovelText || hasVoiceLines },
+    { id: 'editor', label: t('editor'), enabled: hasEditor },
   ]
 
   return (

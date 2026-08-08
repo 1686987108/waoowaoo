@@ -52,6 +52,7 @@ interface UseWorkspaceStageRuntimeParams {
     field?: 'videoPrompt' | 'firstLastFramePrompt',
   ) => Promise<void>
   handleUpdatePanelVideoModel: (storyboardId: string, panelIndex: number, model: string) => Promise<void>
+  onEnterEditor?: () => void
 }
 
 export function useWorkspaceStageRuntime({
@@ -110,6 +111,7 @@ export function useWorkspaceStageRuntime({
     onUpdateVideoPrompt: handleUpdateVideoPrompt,
     onUpdatePanelVideoModel: handleUpdatePanelVideoModel,
     onOpenAssetLibraryForCharacter: (characterId, refreshAssets) => openAssetLibrary(characterId, refreshAssets),
+    onEnterEditor,
   }), [
     artStyle,
     assetsLoading,

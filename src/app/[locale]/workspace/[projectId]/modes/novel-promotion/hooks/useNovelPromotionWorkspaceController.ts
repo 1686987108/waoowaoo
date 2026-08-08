@@ -145,6 +145,7 @@ export function useNovelPromotionWorkspaceController({
     handleGenerateAllVideos: videoActions.handleGenerateAllVideos,
     handleUpdateVideoPrompt: videoActions.handleUpdateVideoPrompt,
     handleUpdatePanelVideoModel: videoActions.handleUpdatePanelVideoModel,
+    onEnterEditor: () => configActions.handleStageChange('editor'),
   })
 
   const uiState = {
@@ -197,6 +198,7 @@ export function useNovelPromotionWorkspaceController({
     handleGenerateAllVideos: videoActions.handleGenerateAllVideos,
     handleUpdateVideoPrompt: videoActions.handleUpdateVideoPrompt,
     handleUpdatePanelVideoModel: videoActions.handleUpdatePanelVideoModel,
+    onEnterEditor: () => configActions.handleStageChange('editor'),
     handleUpdateClip: videoActions.handleUpdateClip,
   }
 
