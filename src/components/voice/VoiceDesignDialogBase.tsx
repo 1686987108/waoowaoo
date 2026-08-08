@@ -89,7 +89,7 @@ export default function VoiceDesignDialogBase({
     try {
       const voices: GeneratedVoice[] = []
       for (let i = 0; i < 3; i += 1) {
-        const safeName = `voice_${Date.now().toString(36)}_${i + 1}`.slice(0, 16)
+        const safeName = `voice_${i + 1}`
         const data = await onDesignVoice({
           voicePrompt: voicePrompt.trim(),
           previewText: previewText.trim(),
@@ -281,7 +281,7 @@ export default function VoiceDesignDialogBase({
               <div className="grid grid-cols-3 gap-2">
                 {generatedVoices.map((voice, index) => (
                   <div
-                    key={voice.voiceId}
+                    key={index}
                     onClick={() => setSelectedIndex(index)}
                     className={`relative p-3 rounded-lg border-2 cursor-pointer transition-all text-center ${
                       selectedIndex === index

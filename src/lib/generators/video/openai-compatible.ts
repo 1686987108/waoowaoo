@@ -161,6 +161,36 @@ async function createVideoViaFetchFallback(
 }
 
 /**
+ * Re-issue the video create request via raw fetch to capture the provider's
+ * real error body. OpenAI SDK v6 swallows the HTTP response body on 4xx/5xx
+ * (throws "400 status code (no body)"), so when the SDK fails we replay the
+ * request once to obtain Agnes's actual error (e.g. content_policy_violation).
+ */
+async function fetchVideoProviderError(
+  baseUrl: string,
+  apiKey: string,
+  payload: Record<string, unknown>,
+): Promise<{ code?: string; message?: unknown } | null> {
+  const url = `${baseUrl.replace(/\/+$/, '')}/videos`
+  try {
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify(payload),
+    })
+    if (response.ok) return null
+    const data = (await response.json().catch(() => null)) as { code?: string; message?: unknown } | null
+    if (data && (typeof data.code === 'string' || data.message !== undefined)) return data
+    return { message: `${response.status} ${response.statusText}` }
+  } catch {
+    return null
+  }
+}
+
+/**
  * 判断是否为端点不支持的错误（404/405/500 无 body 等）
  */
 function isEndpointUnsupportedError(error: unknown): boolean {
@@ -251,13 +281,43 @@ export class OpenAICompatibleVideoGenerator extends BaseVideoGenerator {
         ...requestPayload,
         ...(imageParam !== undefined ? { image: imageParam } : {}),
       }
-      const response = await client.videos.create(
-        sdkPayload as Parameters<typeof client.videos.create>[0],
-      )
-      if (!response.id || typeof response.id !== 'string') {
-        throw new Error('OPENAI_VIDEO_CREATE_INVALID_RESPONSE: missing video id')
+      try {
+        const response = await client.videos.create(
+          sdkPayload as Parameters<typeof client.videos.create>[0],
+        )
+        if (!response.id || typeof response.id !== 'string') {
+          throw new Error('OPENAI_VIDEO_CREATE_INVALID_RESPONSE: missing video id')
+        }
+        return response.id
       }
-      return response.id
+      catch (sdkError) {
+        // OpenAI SDK v6 loses the HTTP response body on 4xx/5xx ("400 status code
+        // (no body)"). Replay once via raw fetch to capture Agnes's real error so
+        // we can surface content-policy rejections instead of a generic 400.
+        const status = (sdkError as { status?: number })?.status
+        const sdkMessage = sdkError instanceof Error ? sdkError.message : String(sdkError)
+        const needsBody = status === 400 || status === undefined || /no body/i.test(sdkMessage)
+        if (needsBody) {
+          const providerError = await fetchVideoProviderError(config.baseUrl!, config.apiKey, sdkPayload).catch(() => null)
+          if (providerError) {
+            const code = String(providerError.code ?? '').toLowerCase()
+            const detail = typeof providerError.message === 'string'
+              ? providerError.message
+              : providerError.message !== undefined
+                ? JSON.stringify(providerError.message)
+                : ''
+            const isPolicy = /policy_violation|content_policy|moderation|sensitive|unsafe/i.test(code)
+              || /policy_violation|content_policy|moderation|sensitive|unsafe/i.test(detail)
+            if (isPolicy) {
+              throw new Error(`SENSITIVE_CONTENT_VIOLATION (policy_violation): ${detail || 'Content policy violation'}`)
+            }
+            if (detail) {
+              throw new Error(`PROVIDER_VIDEO_ERROR: ${detail}`)
+            }
+          }
+        }
+        throw sdkError
+      }
     }
 
     async function createVideoViaFetchFallbackWrapper(): Promise<string> {

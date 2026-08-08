@@ -125,6 +125,22 @@ export const PRESET_MODELS: PresetModel[] = [
 
     // 音频模型
     { modelId: 'fal-ai/index-tts-2/text-to-speech', name: 'IndexTTS 2', type: 'audio', provider: 'fal' },
+    { modelId: 'google/chirp3-hd', name: 'Chirp3 HD (免费)', type: 'audio', provider: 'google' },
+    { modelId: 'huggingface/facebook/mms-tts-zho', name: 'MMS TTS 中文 (免费)', type: 'audio', provider: 'huggingface' },
+    { modelId: 'huggingface/facebook/mms-tts-eng', name: 'MMS TTS 英文 (免费)', type: 'audio', provider: 'huggingface' },
+    { modelId: 'huggingface/microsoft/speecht5_tts', name: 'SpeechT5 (免费)', type: 'audio', provider: 'huggingface' },
+    { modelId: 'huggingface/suno/bark', name: 'Bark 多语言 (免费)', type: 'audio', provider: 'huggingface' },
+    { modelId: 'huggingface/coqui/XTTS-v2', name: 'XTTS v2 复刻 (免费)', type: 'audio', provider: 'huggingface' },
+    // 国内免费语音合成模型（阿里巴巴通义万相）
+    { modelId: 'qwen/sambert-hifigan', name: '通用声线中文 TTS (免费额度)', type: 'audio', provider: 'qwen' },
+    { modelId: 'qwen/cosyvoice-v1', name: 'CosyVoice v1 多语言 TTS (免费额度)', type: 'audio', provider: 'qwen' },
+    { modelId: 'qwen/cosyvoice-v2', name: 'CosyVoice v2 多语言 TTS (免费额度)', type: 'audio', provider: 'qwen' },
+    // 浏览器原生语音合成（完全免费，无需API Key）
+    { modelId: 'browser/speechsynthesis', name: '浏览器内置 TTS (完全免费, 无需API Key)', type: 'audio', provider: 'browser' },
+    { modelId: 'browser/speechsynthesis-zh', name: '浏览器中文 TTS (完全免费, 无需API Key)', type: 'audio', provider: 'browser' },
+    { modelId: 'browser/speechsynthesis-en', name: '浏览器英文 TTS (完全免费, 无需API Key)', type: 'audio', provider: 'browser' },
+    // 微软 Edge 在线神经语音（完全免费，无需 API Key；服务端合成，可落库 / 可下载）
+    { modelId: 'edge-tts', name: 'Microsoft Edge TTS (免费, 无需API Key)', type: 'audio', provider: 'edge-tts' },
     // 口型同步模型
     { modelId: 'fal-ai/kling-video/lipsync/audio-to-video', name: 'Kling Lip Sync', type: 'lipsync', provider: 'fal' },
     { modelId: 'vidu-lipsync', name: 'Vidu Lip Sync', type: 'lipsync', provider: 'vidu' },
@@ -167,6 +183,9 @@ export const PRESET_PROVIDERS: Omit<Provider, 'apiKey' | 'hasApiKey'>[] = [
     { id: 'vidu', name: 'Vidu' },
     { id: 'fal', name: 'FAL' },
     { id: 'qwen', name: 'Qwen' },
+    { id: 'huggingface', name: 'Hugging Face Inference API' },
+    { id: 'browser', name: 'Browser Built-in (免费, 无需API Key)' },
+    { id: 'edge-tts', name: 'Microsoft Edge TTS (免费, 无需API Key)' },
 ]
 
 const ZH_PROVIDER_NAME_MAP: Record<string, string> = {
@@ -338,6 +357,24 @@ export const PROVIDER_TUTORIALS: ProviderTutorial[] = [
             {
                 text: 'qwen_step1',
                 url: 'https://bailian.console.aliyun.com/cn-beijing/?tab=model#/api-key'
+            }
+        ]
+    },
+    {
+        providerId: 'huggingface',
+        steps: [
+            {
+                text: 'huggingface_step1',
+                url: 'https://huggingface.co/settings/tokens'
+            }
+        ]
+    },
+    {
+        providerId: 'browser',
+        steps: [
+            {
+                text: 'browser_step1',
+                url: 'https://developer.mozilla.org/en-US/docs/Web/API/SpeechSynthesis'
             }
         ]
     }

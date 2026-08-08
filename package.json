@@ -122,6 +122,7 @@
     "next": "^15.5.7",
     "next-auth": "^4.24.11",
     "next-intl": "^4.7.0",
+    "node-edge-tts": "^1.2.10",
     "openai": "^6.8.1",
     "prisma": "^6.16.2",
     "react": "19.1.0",

@@ -114,8 +114,7 @@ function buildTextTaskInfo(taskType: TaskType, payload: AnyPayload): TaskBilling
 }
 
 function buildImageTaskInfo(taskType: TaskType, payload: AnyPayload): TaskBillingInfo | null {
-  const model = pickFirstString([payload?.imageModel, payload?.modelId, payload?.model])
-  if (!model) return null
+  const model = pickFirstString([payload?.imageModel, payload?.modelId, payload?.model, payload?.analysisModel]) || 'placeholder-model'
   const quantity = Math.max(1, Math.floor(toNumber(payload?.candidateCount ?? payload?.count, 1)))
   const generationOptions = toRecord(payload?.generationOptions)
   const resolution = readString(generationOptions.resolution) || readString(payload?.resolution)

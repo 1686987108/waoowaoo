@@ -19,6 +19,7 @@ import {
 import { GoogleVeoVideoGenerator } from './video/google'
 import { OpenAICompatibleVideoGenerator } from './video'
 import { QwenTTSGenerator } from './audio'
+import { EdgeTtsGenerator } from './audio/edge-tts'
 import { MinimaxVideoGenerator } from './minimax'
 import { ViduVideoGenerator } from './vidu'
 import { getProviderKey } from '@/lib/api-config'
@@ -94,6 +95,8 @@ export function createAudioGenerator(provider: string): AudioGenerator {
     switch (providerKey) {
         case 'qwen':
             return new QwenTTSGenerator()
+        case 'edge-tts':
+            return new EdgeTtsGenerator()
         default:
             throw new Error(`Unknown audio generator provider: ${provider}`)
     }

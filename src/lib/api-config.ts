@@ -344,18 +344,25 @@ export interface ProviderConfig {
   videoMode?: 'multipart' | 'json'
 }
 
+/**
+ * 无需 API Key 的提供商（浏览器 TTS、微软 Edge TTS 等）。
+ * 这些提供商在配置中心本就不填 Key，调用方不得因缺少 Key 而报错。
+ */
+const NO_KEY_PROVIDER_KEYS = new Set(['browser', 'edge-tts'])
+
 export async function getProviderConfig(userId: string, providerId: string): Promise<ProviderConfig> {
   const { providers } = await readUserConfig(userId)
   const provider = pickProviderStrict(providers, providerId)
 
-  if (!provider.apiKey) {
-    throw new Error(`PROVIDER_API_KEY_MISSING: ${provider.id}`)
+  const providerKey = getProviderKey(provider.id).toLowerCase()
+  if (!provider.apiKey && !NO_KEY_PROVIDER_KEYS.has(providerKey)) {
+    throw new Error(`请先为「${provider.name || provider.id}」提供商配置 API Key（个人中心 → API 配置）`)
   }
 
   return {
     id: provider.id,
     name: provider.name,
-    apiKey: decryptApiKey(provider.apiKey),
+    apiKey: provider.apiKey ? decryptApiKey(provider.apiKey) : '',
     baseUrl: normalizeProviderBaseUrl(provider.id, provider.baseUrl),
     apiMode: provider.apiMode,
     imageEditMode: provider.imageEditMode,

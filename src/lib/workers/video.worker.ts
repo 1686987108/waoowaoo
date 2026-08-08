@@ -294,6 +294,13 @@ export function createVideoWorker() {
     {
       connection: queueRedis,
       concurrency: Number.parseInt(process.env.QUEUE_CONCURRENCY_VIDEO || '4', 10) || 4,
+      // BullMQ enforces the rate limiter on the Worker, not the Queue:
+      // Agnes caps video generation at 1 request/min, so throttle processing
+      // to 1 job / 60s to avoid the 429 rate-limit failure storm.
+      limiter: {
+        max: 1,
+        duration: 60_000,
+      },
     },
   )
 }

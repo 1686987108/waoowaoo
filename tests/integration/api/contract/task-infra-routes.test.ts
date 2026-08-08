@@ -36,7 +36,10 @@ const queryTaskTargetStatesMock = vi.hoisted(() => vi.fn())
 const withPrismaRetryMock = vi.hoisted(() => vi.fn(async <T>(fn: () => Promise<T>) => await fn()))
 const listEventsAfterMock = vi.hoisted(() => vi.fn(async () => []))
 const listTaskLifecycleEventsMock = vi.hoisted(() => vi.fn(async () => []))
-const addChannelListenerMock = vi.hoisted(() => vi.fn(async () => async () => undefined))
+const addChannelListenerMock = vi.hoisted(() => vi.fn(async (_channel: string, listener: (message: string) => void) => {
+  subscriberState.listener = listener
+  return async () => undefined
+}))
 const subscriberState = vi.hoisted(() => ({
   listener: null as ((message: string) => void) | null,
 }))
@@ -145,7 +148,7 @@ describe('api contract - task infra routes (behavior)', () => {
     ])
     addChannelListenerMock.mockImplementation(async (_channel: string, listener: (message: string) => void) => {
       subscriberState.listener = listener
-      return async () => undefined
+      return () => Promise.resolve(undefined)
     })
     listTaskLifecycleEventsMock.mockResolvedValue([])
   })

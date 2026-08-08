@@ -26,7 +26,7 @@ const MODEL_PROVIDER_KEYS = [
   'gemini-compatible',
   'openai-compatible',
 ]
-const AUDIO_PROVIDER_KEYS = ['qwen']
+const AUDIO_PROVIDER_KEYS = ['qwen', 'edge-tts', 'browser']
 
 function isModelProviderType(type: CustomModel['type']): type is 'llm' | 'image' | 'video' | 'lipsync' {
   return MODEL_TYPES.includes(type as 'llm' | 'image' | 'video' | 'lipsync')

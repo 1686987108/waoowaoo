@@ -30,7 +30,7 @@ const authState = vi.hoisted<AuthState>(() => ({
   projectMode: 'novel-promotion',
 }))
 
-const submitTaskMock = vi.hoisted(() => vi.fn<[], Promise<SubmitResult>>())
+const submitTaskMock = vi.hoisted(() => vi.fn())
 
 const configServiceMock = vi.hoisted(() => ({
   getUserModelConfig: vi.fn(async () => ({

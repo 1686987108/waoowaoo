@@ -3,6 +3,7 @@ import { fal } from '@fal-ai/client'
 import { prisma } from '@/lib/prisma'
 import { getAudioApiKey, getProviderKey, resolveModelSelectionOrSingle } from '@/lib/api-config'
 import { extractCOSKey, getSignedUrl, imageUrlToBase64, toFetchableUrl, uploadToCOS } from '@/lib/cos'
+import { synthesizeEdgeTtsToBuffer, pickEdgeVoice, detectEdgeLanguage } from '@/lib/generators/audio/edge-tts'
 import { resolveStorageKeyFromMediaValue } from '@/lib/media/service'
 
 type CheckCancelled = () => Promise<void>
@@ -169,72 +170,71 @@ export async function generateVoiceLine(params: {
   const character = matchCharacterBySpeaker(line.speaker, projectData.characters || [])
   const speakerVoice = speakerVoices[line.speaker]
   const referenceAudioUrl = character?.customVoiceUrl || speakerVoice?.audioUrl
-  if (!referenceAudioUrl) {
-    throw new Error('请先为该发言人设置参考音频')
-  }
 
   const text = (line.content || '').trim()
   if (!text) {
     throw new Error('Voice line text is empty')
   }
 
-  // 将各种格式的 referenceAudioUrl 统一转为可访问的 URL
-  // 兼容旧数据中存的 /m/m_xxx 媒体路由格式
-  let fullAudioUrl: string
-  if (referenceAudioUrl.startsWith('http') || referenceAudioUrl.startsWith('data:')) {
-    // http/data: 直接用
-    fullAudioUrl = referenceAudioUrl
-  } else if (referenceAudioUrl.startsWith('/m/')) {
-    // 媒体路由格式：从数据库解析 storageKey → 再 getSignedUrl
-    const storageKey = await resolveStorageKeyFromMediaValue(referenceAudioUrl)
-    if (!storageKey) {
-      throw new Error(`无法解析参考音频路径: ${referenceAudioUrl}`)
-    }
-    fullAudioUrl = getSignedUrl(storageKey, 3600)
-  } else if (referenceAudioUrl.startsWith('/api/files/')) {
-    // 本地签名路径：extractCOSKey → getSignedUrl
-    const storageKey = extractCOSKey(referenceAudioUrl)
-    fullAudioUrl = storageKey ? getSignedUrl(storageKey, 3600) : referenceAudioUrl
-  } else {
-    // 原始 storageKey（如 voice/xxx.wav）
-    fullAudioUrl = getSignedUrl(referenceAudioUrl, 3600)
-  }
   const audioSelection = await resolveModelSelectionOrSingle(params.userId, params.audioModel, 'audio')
   const providerKey = getProviderKey(audioSelection.provider).toLowerCase()
-  if (providerKey !== 'fal') {
-    throw new Error(`AUDIO_PROVIDER_UNSUPPORTED: ${audioSelection.provider}`)
+
+  if (providerKey === 'fal') {
+    if (!referenceAudioUrl) {
+      throw new Error('请先为该发言人设置参考音频')
+    }
+    let fullAudioUrl: string
+    if (referenceAudioUrl.startsWith('http') || referenceAudioUrl.startsWith('data:')) {
+      fullAudioUrl = referenceAudioUrl
+    } else if (referenceAudioUrl.startsWith('/m/')) {
+      const storageKey = await resolveStorageKeyFromMediaValue(referenceAudioUrl)
+      if (!storageKey) {
+        throw new Error(`无法解析参考音频路径: ${referenceAudioUrl}`)
+      }
+      fullAudioUrl = getSignedUrl(storageKey, 3600)
+    } else if (referenceAudioUrl.startsWith('/api/files/')) {
+      const storageKey = extractCOSKey(referenceAudioUrl)
+      fullAudioUrl = storageKey ? getSignedUrl(storageKey, 3600) : referenceAudioUrl
+    } else {
+      fullAudioUrl = getSignedUrl(referenceAudioUrl, 3600)
+    }
+    const falApiKey = await getAudioApiKey(params.userId, audioSelection.modelKey)
+    const generated = await generateVoiceWithIndexTTS2({
+      endpoint: audioSelection.modelId,
+      referenceAudioUrl: fullAudioUrl,
+      text,
+      emotionPrompt: line.emotionPrompt,
+      strength: line.emotionStrength ?? 0.4,
+      falApiKey,
+    })
+    const audioKey = `voice/${params.projectId}/${episodeId}/${line.id}.wav`
+    const cosKey = await uploadToCOS(generated.audioData, audioKey)
+    await checkCancelled?.()
+    await prisma.novelPromotionVoiceLine.update({
+      where: { id: line.id },
+      data: { audioUrl: cosKey, audioDuration: generated.audioDuration || null },
+    })
+    const signedUrl = getSignedUrl(cosKey, 7200)
+    return { lineId: line.id, audioUrl: signedUrl, storageKey: cosKey, audioDuration: generated.audioDuration || null }
   }
-  const falApiKey = await getAudioApiKey(params.userId, audioSelection.modelKey)
 
-  const generated = await generateVoiceWithIndexTTS2({
-    endpoint: audioSelection.modelId,
-    referenceAudioUrl: fullAudioUrl,
-    text,
-    emotionPrompt: line.emotionPrompt,
-    strength: line.emotionStrength ?? 0.4,
-    falApiKey,
-  })
-
-  const audioKey = `voice/${params.projectId}/${episodeId}/${line.id}.wav`
-  const cosKey = await uploadToCOS(generated.audioData, audioKey)
-
-  await checkCancelled?.()
-
-  await prisma.novelPromotionVoiceLine.update({
-    where: { id: line.id },
-    data: {
-      audioUrl: cosKey,
-      audioDuration: generated.audioDuration || null,
-    },
-  })
-
-  const signedUrl = getSignedUrl(cosKey, 7200)
-  return {
-    lineId: line.id,
-    audioUrl: signedUrl,
-    storageKey: cosKey,
-    audioDuration: generated.audioDuration || null,
+  if (providerKey === 'edge-tts') {
+    const language = detectEdgeLanguage(text)
+    const voice = pickEdgeVoice(language, line.speaker || text)
+    const buf = await synthesizeEdgeTtsToBuffer(text, voice, 1.0)
+    const audioKey = `voice/${params.projectId}/${episodeId}/${line.id}.mp3`
+    const cosKey = await uploadToCOS(buf, audioKey)
+    const duration = getWavDurationFromBuffer(buf)
+    await checkCancelled?.()
+    await prisma.novelPromotionVoiceLine.update({
+      where: { id: line.id },
+      data: { audioUrl: cosKey, audioDuration: duration },
+    })
+    const signedUrl = getSignedUrl(cosKey, 7200)
+    return { lineId: line.id, audioUrl: signedUrl, storageKey: cosKey, audioDuration: duration }
   }
+
+  throw new Error(`AUDIO_PROVIDER_UNSUPPORTED: ${audioSelection.provider}`)
 }
 
 export function estimateVoiceLineMaxSeconds(content: string | null | undefined) {
