@@ -182,6 +182,26 @@ async function toFetchableAbsoluteUrl(value: string): Promise<string> {
   return toFetchableUrl(value)
 }
 
+/**
+ * Worker 内部 fetch 本地 HTTPS 自签名证书时会失败（NEXTAUTH_URL 常为 https://localhost）。
+ * 服务端环境把 localhost/127.0.0.1 的 https 回环改成 http://localhost:3000，避免 TLS 验证错误。
+ */
+function toWorkerSafeFetchUrl(url: string): string {
+  if (typeof window !== 'undefined') return url
+  try {
+    const parsed = new URL(url)
+    const isLocalhost = parsed.hostname === 'localhost'
+      || parsed.hostname === '127.0.0.1'
+      || parsed.hostname === '::1'
+    if (isLocalhost && parsed.protocol === 'https:') {
+      return `http://localhost:3000${parsed.pathname}${parsed.search}`
+    }
+  } catch {
+    // ignore invalid URL
+  }
+  return url
+}
+
 function unwrapNextImageInternal(input: string): string {
   let current = input.trim()
   for (let i = 0; i < MAX_NEXT_IMAGE_UNWRAP_DEPTH; i += 1) {
@@ -287,15 +307,16 @@ export async function normalizeToBase64ForGeneration(input: string): Promise<str
   }
 
   const fetchUrl = await toFetchableAbsoluteUrl(normalizedUrl)
+  const workerSafeFetchUrl = toWorkerSafeFetchUrl(fetchUrl)
   let response: Response
   try {
-    response = await fetch(fetchUrl)
+    response = await fetch(workerSafeFetchUrl)
   } catch {
     throw new OutboundImageNormalizeError({
       code: 'OUTBOUND_IMAGE_FETCH_EXCEPTION',
       stage: 'normalize_base64',
       input: normalizedUrl,
-      message: `normalizeToBase64ForGeneration fetch exception: ${fetchUrl}`,
+      message: `normalizeToBase64ForGeneration fetch exception: ${workerSafeFetchUrl}`,
     })
   }
 
